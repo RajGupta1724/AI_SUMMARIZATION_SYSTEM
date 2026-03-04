@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBRAUBOT - AI Document Assistant</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* ============================================
+           ADDITIONAL PAGE STYLES
+        ============================================ */
+
+        /* ---- USERNAME IN HEADER ---- */
+        .user-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(212,175,55,0.08);
+            border: 1px solid rgba(212,175,55,0.2);
+            border-radius: 999px;
+            padding: 5px 14px 5px 6px;
+            font-size: 13px;
+            color: var(--color-accent);
+            font-weight: 500;
+        }
+        .user-avatar {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+            color: #000;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700;
+        }
+
+        /* ---- LOGIN GATE OVERLAY ---- */
+        #loginGate {
+            position: fixed; inset: 0;
+            background: linear-gradient(135deg, #050505 0%, #0b0b0b 55%, #151515 100%);
+            z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column;
+        }
+        body[data-theme="light"] #loginGate {
+            background: linear-gradient(135deg, #ebe6dd 0%, #f4f1ea 55%, #ffffff 100%);
+        }
+        .gate-logo-wrap {
+            display: flex; align-items: center; gap: 22px; margin-bottom: 32px;
+        }
+        .gate-side-img {
+            width: 80px; height: 80px; border-radius: 14px; overflow: hidden;
+            border: 1px solid rgba(212,175,55,0.2);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .gate-side-img img { width: 100%; height: 100%; object-fit: cover; }
+        .gate-center-logo {
+            width: 110px; height: 110px; border-radius: 50%;
+            border: 3px solid rgba(212,175,55,0.4);
+            box-shadow: 0 0 40px rgba(212,175,55,0.25);
+            overflow: hidden;
+        }
+        .gate-center-logo img { width:100%; height:100%; object-fit:cover; }
+        .gate-card {
+            background: rgba(26,26,26,0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(212,175,55,0.18);
+            border-radius: 24px;
+            padding: 40px 44px;
+            width: 100%; max-width: 420px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+        }
+        body[data-theme="light"] .gate-card {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(176,125,18,0.2);
+        }
+        .gate-card h2 {
+            text-align: center; margin-bottom: 6px; font-size: 1.8rem;
+        }
+        .gate-card .gate-subtitle {
+            text-align: center; color: var(--color-text-secondary);
+            font-size: 0.9rem; margin-bottom: 28px;
+        }
+        .gate-theme-toggle {
+            position: fixed; top: 20px; right: 20px;
+        }
+        #gateLoginError {
+            color: #ff6b6b;
+            font-size: 0.85rem;
+            text-align: center;
+            margin-top: -10px;
+            margin-bottom: 6px;
+            display: none;
+        }
+
+        /* ---- DOCUMENTS PAGE ---- */
+        #documentsPage .page-header {
+            margin-bottom: 30px;
+        }
+        .documents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+        }
+        .doc-card {
+            padding: 22px;
+            display: flex; flex-direction: column; gap: 12px;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        .doc-card:hover { transform: translateY(-6px); border-color: rgba(212,175,55,0.35); }
+        .doc-card-icon { font-size: 36px; }
+        .doc-card-name { font-weight: 600; font-size: 0.95rem; word-break: break-word; }
+        .doc-card-meta { font-size: 0.8rem; color: var(--color-text-secondary); display: flex; gap: 12px; }
+        .doc-card-actions { display: flex; gap: 8px; margin-top: 4px; }
+        .btn-xs {
+            padding: 5px 12px; font-size: 12px; border-radius: 8px;
+            border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .btn-xs-primary { background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark)); color: #000; }
+        .btn-xs-danger { background: rgba(255,80,80,0.15); color: #ff6b6b; border: 1px solid rgba(255,80,80,0.3); }
+        .btn-xs-danger:hover { background: rgba(255,80,80,0.25); }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--color-text-secondary); }
+        .empty-state .empty-icon { font-size: 60px; margin-bottom: 16px; }
+
+        /* ---- CHAT HISTORY PAGE ---- */
+        #chatHistoryPage .history-list { display: flex; flex-direction: column; gap: 14px; }
+        .history-card {
+            padding: 20px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .history-card:hover { transform: translateX(6px); border-color: rgba(212,175,55,0.3); }
+        .history-card-left { display: flex; flex-direction: column; gap: 4px; }
+        .history-card-title { font-weight: 600; font-size: 0.95rem; }
+        .history-card-meta { font-size: 0.8rem; color: var(--color-text-secondary); }
+        .history-card-arrow { color: var(--color-accent); font-size: 1.2rem; }
+
+        /* ---- SETTINGS PAGE ---- */
+        #settingsPage .settings-section {
+            background: rgba(26,26,26,0.7);
+            border: 1px solid rgba(212,175,55,0.1);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+        body[data-theme="light"] #settingsPage .settings-section {
+            background: rgba(255,255,255,0.8);
+        }
+        .settings-section h4 { margin-bottom: 18px; color: var(--color-accent); font-size: 1rem; letter-spacing: 0.5px; text-transform: uppercase; }
+        .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(212,175,55,0.08); }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-row-label { font-size: 0.9rem; }
+        .settings-row-desc { font-size: 0.78rem; color: var(--color-text-secondary); margin-top: 2px; }
+        .toggle-switch { position: relative; width: 44px; height: 24px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: rgba(255,255,255,0.1); border-radius: 12px;
+            transition: 0.3s;
+        }
+        .toggle-slider:before {
+            content: ''; position: absolute;
+            height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background: #fff; border-radius: 50%; transition: 0.3s;
+        }
+        .toggle-switch input:checked + .toggle-slider { background: var(--color-accent); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+        .settings-backend-url {
+            width: 100%; padding: 10px 14px;
+            background: var(--color-grey);
+            border: 1px solid rgba(212,175,55,0.1);
+            border-radius: 10px;
+            color: var(--color-text);
+            font-size: 13px; font-family: monospace;
+            margin-top: 8px;
+        }
+        .settings-backend-url:focus { outline: none; border-color: var(--color-accent); }
+        .settings-save-btn { margin-top: 12px; }
+
+        /* ---- PAGE WRAPPER (non-landing pages) ---- */
+        .inner-page { max-width: 900px; margin: 0 auto; padding: 20px 0 60px; }
+        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; }
+        .page-header h2 { font-size: 1.8rem; }
+
+        /* ---- SEARCH RESULTS DROPDOWN ---- */
+        .search-dropdown {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: rgba(20,20,20,0.97);
+            border: 1px solid rgba(212,175,55,0.2);
+            border-radius: 14px; margin-top: 6px;
+            max-height: 320px; overflow-y: auto; z-index: 500;
+            backdrop-filter: blur(10px);
+        }
+        body[data-theme="light"] .search-dropdown { background: rgba(255,255,255,0.97); }
+        .search-result-item {
+            padding: 12px 18px; display: flex; align-items: center; gap: 12px;
+            cursor: pointer; transition: background 0.2s; font-size: 0.9rem;
+        }
+        .search-result-item:hover { background: rgba(212,175,55,0.1); }
+        .search-result-item .sri-icon { font-size: 20px; }
+        .search-section { position: relative; }
+        .search-container { position: relative; }
+
+        /* ---- NOTIFICATION TOAST ---- */
+        #toastContainer {
+            position: fixed; bottom: 24px; right: 24px;
+            display: flex; flex-direction: column; gap: 10px; z-index: 9998;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            min-width: 240px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            animation: toastIn 0.3s ease-out;
+            backdrop-filter: blur(10px);
+        }
+        .toast-success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #6ee7b7; }
+        .toast-error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+        .toast-info { background: rgba(212,175,55,0.12); border: 1px solid rgba(212,175,55,0.25); color: var(--color-accent); }
+        @keyframes toastIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+
+        /* ---- CONFIRM DIALOG ---- */
+        #confirmDialog {
+            position: fixed; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9997; display: none;
+        }
+        .confirm-card {
+            background: rgba(20,20,20,0.97);
+            border: 1px solid rgba(212,175,55,0.2);
+            border-radius: 18px; padding: 32px;
+            max-width: 380px; width: 90%;
+            text-align: center;
+            backdrop-filter: blur(16px);
+        }
+        body[data-theme="light"] .confirm-card { background: rgba(255,255,255,0.97); }
+        .confirm-card h3 { margin-bottom: 10px; }
+        .confirm-card p { color: var(--color-text-secondary); margin-bottom: 24px; font-size: 0.9rem; }
+        .confirm-actions { display: flex; gap: 12px; justify-content: center; }
+
+        /* ---- LOADING SPINNER ---- */
+        .spinner {
+            display: inline-block; width: 18px; height: 18px;
+            border: 2px solid rgba(212,175,55,0.3);
+            border-top-color: var(--color-accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---- CHAT IMPROVEMENTS ---- */
+        .message-timestamp {
+            font-size: 0.72rem; color: var(--color-text-secondary);
+            margin-top: 4px; opacity: 0.7;
+        }
+        .ai-message .message-content { background: rgba(212,175,55,0.06); border: 1px solid rgba(212,175,55,0.1); }
+        .suggested-questions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+        .suggested-q-btn {
+            padding: 7px 14px; background: rgba(212,175,55,0.08);
+            border: 1px solid rgba(212,175,55,0.2); border-radius: 999px;
+            color: var(--color-accent); font-size: 0.82rem; cursor: pointer;
+            transition: all 0.2s; font-family: 'Space Grotesk', sans-serif;
+        }
+        .suggested-q-btn:hover { background: rgba(212,175,55,0.16); }
+
+        /* ---- CLOUD UPLOAD MODAL ---- */
+        #cloudModal .cloud-providers { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .cloud-provider-btn {
+            display: flex; align-items: center; gap: 14px;
+            padding: 14px 18px;
+            background: rgba(26,26,26,0.6);
+            border: 1px solid rgba(212,175,55,0.15);
+            border-radius: 12px; cursor: pointer;
+            color: var(--color-text); font-size: 0.9rem; font-weight: 500;
+            transition: all 0.2s; font-family: 'Space Grotesk', sans-serif;
+        }
+        .cloud-provider-btn:hover { border-color: var(--color-accent); background: rgba(212,175,55,0.08); }
+        .cloud-provider-icon { font-size: 22px; }
+
+        /* ---- SIDEBAR CHAT HISTORY LIST ---- */
+        .chat-history-list { overflow-y: auto; flex: 1; }
+        .chat-item {
+            padding: 10px 14px; border-radius: 8px;
+            cursor: pointer; font-size: 0.85rem; color: var(--color-text-secondary);
+            transition: all 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .chat-item:hover { background: rgba(212,175,55,0.08); color: var(--color-accent); }
+        .chat-item.active { background: rgba(212,175,55,0.12); color: var(--color-accent); }
+
+        /* ---- MARKDOWN-LIKE FORMATTING ---- */
+        .message-content p { margin-bottom: 8px; }
+        .message-content p:last-child { margin-bottom: 0; }
+        .message-content strong { color: var(--color-accent); }
+        .message-content code {
+            background: rgba(212,175,55,0.1); padding: 2px 6px;
+            border-radius: 4px; font-family: monospace; font-size: 0.88em;
+        }
+        .message-content ul, .message-content ol {
+            margin: 8px 0 8px 20px;
+        }
+
+        /* ---- BACKEND STATUS INDICATOR ---- */
+        .backend-status {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.78rem; color: var(--color-text-secondary);
+        }
+        .status-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+        }
+        .status-dot.online { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.6); }
+        .status-dot.offline { background: #ef4444; }
+        .status-dot.checking { background: #f59e0b; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <!-- ===== LOGIN GATE (blocks entire app until authenticated) ===== -->
+    <div id="loginGate">
+        <button class="btn btn-ghost theme-toggle gate-theme-toggle" id="gateThemeToggle" aria-label="Toggle theme">
+            <span class="theme-toggle-icon">🌙</span>
+            <span class="theme-toggle-text">Night</span>
+        </button>
+
+        <div class="gate-logo-wrap">
+            <div class="gate-side-img"><img src="A++.jpeg" alt="NAAC A+"></div>
+            <div class="gate-center-logo"><img src="DBRAU logo.jpg" alt="DBRAU"></div>
+            <div class="gate-side-img"><img src="nirf.jpeg" alt="NIRF"></div>
+        </div>
+
+        <div class="gate-card">
+            <h2>DBRAUBOT</h2>
+            <p class="gate-subtitle">Dr. Bhimrao Ambedkar University · AI Document Assistant</p>
+
+            <div id="gateLoginError"></div>
+
+            <form id="gateLoginForm" autocomplete="off">
+                <div class="form-group">
+                    <label for="gateEmail">Email / Username</label>
+                    <input type="text" id="gateEmail" placeholder="your@email.com" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="gatePassword">Password</label>
+                    <input type="password" id="gatePassword" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary" id="gateLoginBtn" style="width:100%; margin-top:8px;">
+                    Login
+                </button>
+            </form>
+
+            <div class="divider"><span>Or continue with</span></div>
+            <div class="social-login-options">
+                <button type="button" class="btn-social-icon" id="gateGoogle" title="Google">
+                    <i class="fa-brands fa-google" style="color:#ea4335;"></i>
+                </button>
+                <button type="button" class="btn-social-icon" id="gateGithub" title="GitHub">
+                    <i class="fa-brands fa-github"></i>
+                </button>
+                <button type="button" class="btn-social-icon" id="gateMicrosoft" title="Microsoft">
+                    <i class="fa-brands fa-microsoft" style="color:#00a4ef;"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+        <div class="header-left">
+            <button class="hamburger" id="hamburgerBtn" aria-label="Open menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+        <div class="header-center">
+            <h1 class="logo" style="cursor:pointer;" id="logoHome">DBRAUBOT</h1>
+        </div>
+        <div class="header-right">
+            <div class="backend-status" id="backendStatus" title="Backend connection status">
+                <div class="status-dot checking" id="statusDot"></div>
+                <span id="statusText">Connecting…</span>
+            </div>
+            <div class="user-chip" id="userChip" style="display:none;">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <span id="usernameDisplay">User</span>
+            </div>
+            <button class="btn btn-ghost theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                <span class="theme-toggle-icon">🌙</span>
+                <span class="theme-toggle-text">Night</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>Menu</h2>
+            <button class="close-btn" id="closeSidebarBtn" aria-label="Close menu">&times;</button>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item" data-action="home">
+                <span class="icon">🏠</span><span>Home</span>
+            </a>
+            <a href="#" class="nav-item" data-action="new-chat">
+                <span class="icon">✨</span><span>New Chat</span>
+            </a>
+            <a href="#" class="nav-item" data-action="chat-history">
+                <span class="icon">📋</span><span>Previous Chats</span>
+            </a>
+            <a href="#" class="nav-item" data-action="documents">
+                <span class="icon">📁</span><span>My Documents</span>
+            </a>
+            <a href="#" class="nav-item" data-action="settings">
+                <span class="icon">⚙️</span><span>Settings</span>
+            </a>
+            <a href="#" class="nav-item" data-action="logout" style="margin-top:auto; color: #ff6b6b;">
+                <span class="icon">🚪</span><span>Sign Out</span>
+            </a>
+        </nav>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content">
+
+        <!-- LANDING PAGE -->
+        <section class="page active" id="landingPage">
+            <div class="container-center">
+                <div class="logo-card fade-in">
+                    <div class="logo-container">
+                        <div class="hero-side-logo"><img src="A++.jpeg" alt="NAAC A+" class="hero-side-image"></div>
+                        <div class="logo-circle"><img src="DBRAU logo.jpg" alt="DBRAU" class="logo-image"></div>
+                        <div class="hero-side-logo"><img src="nirf.jpeg" alt="NIRF" class="hero-side-image"></div>
+                    </div>
+                </div>
+
+                <div class="hero-section fade-in" style="animation-delay:0.2s;">
+                    <h2 class="hero-title">AI-Powered Document Assistant</h2>
+                    <p class="hero-subtitle">Upload manuscripts, research papers, or any PDF — get intelligent summaries, insights, and have a natural conversation with your documents.</p>
+                </div>
+
+                <div class="search-section fade-in" style="animation-delay:0.35s; width:100%; max-width:700px;">
+                    <div class="search-container">
+                        <input type="text" class="search-input" id="globalSearch" placeholder="Search your documents and chats…" autocomplete="off">
+                        <button class="btn-sparkle" id="searchBtn" title="Search">✨</button>
+                    </div>
+                    <div class="search-dropdown" id="searchDropdown" style="display:none;"></div>
+                </div>
+
+                <div class="upload-cards-container fade-in" style="animation-delay:0.5s;">
+                    <div class="upload-card glass-card" id="cloudUploadCard">
+                        <div class="upload-icon">☁️</div>
+                        <h3>Upload from Cloud</h3>
+                        <p>Connect to Google Drive, Dropbox, or OneDrive</p>
+                        <button class="btn btn-secondary" id="cloudUploadBtn">Connect Cloud</button>
+                    </div>
+                    <div class="upload-card glass-card">
+                        <div class="upload-icon">💻</div>
+                        <h3>Upload from Device</h3>
+                        <p>Upload PDF files directly from your computer</p>
+                        <button class="btn btn-primary" id="systemUploadBtn">Choose File</button>
+                    </div>
+                </div>
+
+                <div class="drop-zone glass-card fade-in" id="dropZone" style="animation-delay:0.65s;">
+                    <div class="drop-zone-content">
+                        <div class="drop-icon">📥</div>
+                        <h3>Drag & Drop your PDF here</h3>
+                        <p>Supports PDFs up to 1000+ pages · Secure local processing</p>
+                        <div class="drop-progress" id="dropProgress" style="display:none;">
+                            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                            <p id="progressText">Uploading… 0%</p>
+                        </div>
+                    </div>
+                    <input type="file" id="fileInput" accept=".pdf" style="display:none;">
+                </div>
+
+                <div class="features-section fade-in" style="animation-delay:0.8s;">
+                    <h3 class="section-title">Why Choose DBRAUBOT?</h3>
+                    <div class="features-grid">
+                        <div class="feature-card glass-card">
+                            <div class="feature-icon">🧠</div>
+                            <h4>Hierarchical RAG</h4>
+                            <p>Binary-tree context retrieval — accurate answers even from 1000-page manuscripts</p>
+                        </div>
+                        <div class="feature-card glass-card">
+                            <div class="feature-icon">🔒</div>
+                            <h4>100% Private</h4>
+                            <p>LLM runs locally — your documents never leave your infrastructure</p>
+                        </div>
+                        <div class="feature-card glass-card">
+                            <div class="feature-icon">⚡</div>
+                            <h4>Full Conversation Memory</h4>
+                            <p>Complete chat history sent with every query — no context loss</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DOCUMENT PROCESSING PAGE -->
+        <section class="page" id="processingPage">
+            <div class="container-center processing-container">
+                <h2 class="processing-title">Processing Your Document</h2>
+                <div class="progress-steps">
+                    <div class="step active" id="step1">
+                        <div class="step-number">1</div>
+                        <div class="step-label">Uploading</div>
+                    </div>
+                    <div class="step-connector active" id="connector1"></div>
+                    <div class="step" id="step2">
+                        <div class="step-number">2</div>
+                        <div class="step-label">Analyzing</div>
+                    </div>
+                    <div class="step-connector" id="connector2"></div>
+                    <div class="step" id="step3">
+                        <div class="step-number">3</div>
+                        <div class="step-label">Generating Summary</div>
+                    </div>
+                </div>
+
+                <div class="summary-card glass-card" id="summaryCard" style="display:none;">
+                    <div class="summary-header">
+                        <h3>Document Summary</h3>
+                        <span class="summary-confidence" id="confidenceScore">Pages: —</span>
+                    </div>
+                    <div class="summary-content" id="summaryContent"></div>
+
+                    <div id="suggestedQuestionsWrap" style="margin-top:20px; display:none;">
+                        <p style="font-size:0.85rem; color:var(--color-text-secondary); margin-bottom:8px;">💡 Suggested Questions:</p>
+                        <div class="suggested-questions" id="suggestedQuestions"></div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="startChattingBtn" style="display:none; margin-top:2rem;">
+                    Start Chatting →
+                </button>
+            </div>
+        </section>
+
+        <!-- CHAT PAGE -->
+        <section class="page" id="chatPage">
+            <div class="chat-container">
+                <aside class="chat-sidebar glass-card">
+                    <div class="sidebar-top">
+                        <button class="btn btn-primary" id="newChatBtn" style="width:100%;">+ New Chat</button>
+                        <div class="document-info">
+                            <h4>Current Document</h4>
+                            <p id="documentTitle" style="font-size:0.85rem; word-break:break-word;">—</p>
+                            <div class="document-stats" id="documentStats">
+                                <span id="docPages">—</span>
+                                <span id="docWords">—</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-history-list" id="chatHistoryList">
+                        <h5>Recent Chats</h5>
+                    </div>
+                </aside>
+
+                <div class="chat-main">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message ai-message fade-in">
+                            <div class="message-content">
+                                <p>Hello! I've analyzed your document. Ask me anything — I'll answer based solely on its contents.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="typing-indicator" id="typingIndicator" style="display:none;">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+
+                    <div class="chat-input-area">
+                        <div class="chat-input-container glass-card">
+                            <input type="text" id="chatInput" class="chat-input"
+                                placeholder="Ask a question about your document…" autocomplete="off">
+                            <button class="btn-send" id="sendBtn" aria-label="Send">→</button>
+                        </div>
+                        <p class="chat-hint">Press Enter to send · Answers are based only on the uploaded document</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CHAT HISTORY PAGE -->
+        <section class="page" id="chatHistoryPage">
+            <div class="inner-page">
+                <div class="page-header">
+                    <h2>Previous Chats</h2>
+                    <button class="btn btn-secondary" id="refreshHistoryBtn"><i class="fa fa-refresh"></i> Refresh</button>
+                </div>
+                <div id="historyListContainer">
+                    <div class="empty-state" id="historyEmpty" style="display:none;">
+                        <div class="empty-icon">💬</div>
+                        <p>No previous chats yet. Upload a document and start chatting!</p>
+                    </div>
+                    <div class="history-list" id="historyList"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DOCUMENTS PAGE -->
+        <section class="page" id="documentsPage">
+            <div class="inner-page">
+                <div class="page-header">
+                    <h2>My Documents</h2>
+                    <button class="btn btn-primary" id="docsUploadBtn">+ Upload New</button>
+                </div>
+                <div id="documentsContainer">
+                    <div class="empty-state" id="docsEmpty" style="display:none;">
+                        <div class="empty-icon">📁</div>
+                        <p>No documents uploaded yet.</p>
+                    </div>
+                    <div class="documents-grid" id="documentsGrid"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SETTINGS PAGE -->
+        <section class="page" id="settingsPage">
+            <div class="inner-page">
+                <div class="page-header">
+                    <h2>Settings</h2>
+                </div>
+
+                <div class="settings-section">
+                    <h4>🔗 Backend Connection</h4>
+                    <div class="settings-row">
+                        <div>
+                            <div class="settings-row-label">Backend Server URL</div>
+                            <div class="settings-row-desc">URL of your locally running Python backend</div>
+                            <input type="text" class="settings-backend-url" id="backendUrlInput" value="http://localhost:8000" placeholder="http://localhost:8000">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary settings-save-btn" id="saveBackendUrl">Save & Test Connection</button>
+                </div>
+
+                <div class="settings-section">
+                    <h4>🎨 Appearance</h4>
+                    <div class="settings-row">
+                        <div>
+                            <div class="settings-row-label">Dark Mode</div>
+                            <div class="settings-row-desc">Toggle between dark and light themes</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="darkModeToggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>🤖 LLM Configuration</h4>
+                    <div class="settings-row">
+                        <div>
+                            <div class="settings-row-label">Model Provider</div>
+                            <div class="settings-row-desc">Backend handles model selection (Ollama / HuggingFace)</div>
+                        </div>
+                        <span style="color:var(--color-accent); font-size:0.85rem;">Configured on server</span>
+                    </div>
+                    <div class="settings-row">
+                        <div>
+                            <div class="settings-row-label">Full Conversation Context</div>
+                            <div class="settings-row-desc">Send entire chat history with each query for better continuity</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="fullContextToggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>👤 Account</h4>
+                    <div class="settings-row">
+                        <div>
+                            <div class="settings-row-label">Signed in as</div>
+                            <div class="settings-row-desc" id="settingsEmail">—</div>
+                        </div>
+                        <button class="btn btn-secondary" id="settingsLogout" style="color:#ff6b6b; border-color:rgba(255,80,80,0.3);">Sign Out</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ===== CLOUD UPLOAD MODAL ===== -->
+    <div class="modal" id="cloudModal" style="display:none;">
+        <div class="modal-content glass-card">
+            <button class="modal-close" id="closeCloudModal">&times;</button>
+            <h2>Upload from Cloud</h2>
+            <p style="color:var(--color-text-secondary); font-size:0.9rem; margin-bottom:4px;">
+                Select a cloud provider to browse and import your PDF documents.
+            </p>
+            <div class="cloud-providers">
+                <button class="cloud-provider-btn" id="connectGDrive">
+                    <span class="cloud-provider-icon">🟢</span> Google Drive
+                </button>
+                <button class="cloud-provider-btn" id="connectDropbox">
+                    <span class="cloud-provider-icon">🔵</span> Dropbox
+                </button>
+                <button class="cloud-provider-btn" id="connectOneDrive">
+                    <span class="cloud-provider-icon">🟦</span> Microsoft OneDrive
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== CONFIRM DIALOG ===== -->
+    <div id="confirmDialog">
+        <div class="modal-overlay" style="z-index:-1;"></div>
+        <div class="confirm-card">
+            <h3 id="confirmTitle">Are you sure?</h3>
+            <p id="confirmMessage">This action cannot be undone.</p>
+            <div class="confirm-actions">
+                <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
+                <button class="btn btn-primary" id="confirmOk" style="background:linear-gradient(135deg,#ef4444,#b91c1c); color:#fff;">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL OVERLAY (for cloud modal) ===== -->
+    <div class="modal-overlay" id="modalOverlay" style="display:none;"></div>
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div id="toastContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+</body>
+</html>
