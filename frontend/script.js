@@ -993,12 +993,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Smooth scroll to active page section on navigation
     const observer = new MutationObserver(mutations => {
         mutations.forEach(mutation => {
-            if (mutation.target.classList && mutation.target.classList.contains('active') && mutation.target.classList.contains('page')) {
-                mutation.target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (mutation.attributeName === 'class' && mutation.target.classList.contains('active') && mutation.target.classList.contains('page')) {
+                const oldClasses = (mutation.oldValue || '').split(/\s+/);
+                if (!oldClasses.includes('active')) {
+                    mutation.target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
             }
         });
     });
     document.querySelectorAll('.page').forEach(page => {
-        observer.observe(page, { attributes: true, attributeFilter: ['class'] });
+        observer.observe(page, { attributes: true, attributeFilter: ['class'], attributeOldValue: true });
     });
 });
