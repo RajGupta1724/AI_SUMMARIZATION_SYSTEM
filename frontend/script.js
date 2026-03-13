@@ -978,7 +978,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 input.value = question;
                 input.focus();
                 input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Brief highlight feedback
+                card.style.borderColor = 'rgba(212, 175, 55, 0.6)';
+                card.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.3)';
+                setTimeout(() => {
+                    card.style.borderColor = '';
+                    card.style.boxShadow = '';
+                }, 400);
             }
         });
+    });
+
+    // Smooth scroll to active page section on navigation
+    const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            if (mutation.target.classList && mutation.target.classList.contains('active') && mutation.target.classList.contains('page')) {
+                mutation.target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+    document.querySelectorAll('.page').forEach(page => {
+        observer.observe(page, { attributes: true, attributeFilter: ['class'] });
     });
 });
