@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DBRAUBOT - AI Document Assistant</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         /* ============================================
@@ -442,6 +442,7 @@
 
                 <div class="search-section fade-in" style="animation-delay:0.35s; width:100%; max-width:700px;">
                     <div class="search-container">
+                        <span class="search-input-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
                         <input type="text" class="search-input" id="globalSearch" placeholder="Search your documents and chats…" autocomplete="off">
                         <button class="btn-sparkle" id="searchBtn" title="Search">✨</button>
                     </div>
@@ -574,8 +575,28 @@
                         <div class="typing-dot"></div>
                     </div>
 
+                    <!-- Recommended Questions Section -->
+                    <div class="recommended-questions-section" id="recommendedQuestionsSection">
+                        <p class="recommended-questions-label"><i class="fa-solid fa-lightbulb"></i> Recommended Questions</p>
+                        <div class="recommended-questions-grid">
+                            <div class="recommended-q-card" data-question="Give me the complete summary of this document.">
+                                <div class="rq-card-icon"><i class="fa-solid fa-file-lines"></i></div>
+                                <p class="rq-card-text">Give me the complete summary of this document.</p>
+                            </div>
+                            <div class="recommended-q-card" data-question="What are the key points discussed in this document?">
+                                <div class="rq-card-icon"><i class="fa-solid fa-list-check"></i></div>
+                                <p class="rq-card-text">What are the key points discussed in this document?</p>
+                            </div>
+                            <div class="recommended-q-card" data-question="Explain the main concepts of this document in simple terms.">
+                                <div class="rq-card-icon"><i class="fa-solid fa-book-open"></i></div>
+                                <p class="rq-card-text">Explain the main concepts of this document in simple terms.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="chat-input-area">
                         <div class="chat-input-container glass-card">
+                            <span class="chat-input-icon"><i class="fa-solid fa-message"></i></span>
                             <input type="text" id="chatInput" class="chat-input"
                                 placeholder="Ask a question about your document…" autocomplete="off">
                             <button class="btn-send" id="sendBtn" aria-label="Send">→</button>
@@ -726,6 +747,23 @@
 
     <!-- ===== MODAL OVERLAY (for cloud modal) ===== -->
     <div class="modal-overlay" id="modalOverlay" style="display:none;"></div>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="site-footer" id="siteFooter">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <h3 class="footer-logo">DBRAUBOT</h3>
+                <p>AI-Powered Document Assistant by Dr. Bhimrao Ambedkar University</p>
+            </div>
+            <div class="footer-links">
+                <span>© 2025 DBRAU</span>
+                <span class="footer-divider">·</span>
+                <span>Built with AI</span>
+                <span class="footer-divider">·</span>
+                <span>Secure & Private</span>
+            </div>
+        </div>
+    </footer>
 
     <!-- ===== TOAST CONTAINER ===== -->
     <div id="toastContainer"></div>

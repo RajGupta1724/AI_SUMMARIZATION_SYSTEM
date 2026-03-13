@@ -1315,6 +1315,184 @@ body[data-theme="light"] .glass-card {
 }
 
 /* ============================================
+   RECOMMENDED QUESTIONS CARDS
+   ============================================ */
+
+.recommended-questions-section {
+    padding: 12px 40px 0;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.recommended-questions-label {
+    font-size: 0.85rem;
+    color: var(--color-accent);
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.3px;
+}
+
+.recommended-questions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.recommended-q-card {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(212, 175, 55, 0.03) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.15);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.recommended-q-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.recommended-q-card:hover {
+    transform: translateY(-3px) scale(1.02);
+    border-color: rgba(212, 175, 55, 0.35);
+    box-shadow: 0 8px 25px rgba(212, 175, 55, 0.15), 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.recommended-q-card:hover::before {
+    opacity: 1;
+}
+
+.recommended-q-card:active {
+    transform: translateY(-1px) scale(1.0);
+}
+
+body[data-theme="light"] .recommended-q-card {
+    background: linear-gradient(135deg, rgba(176, 125, 18, 0.08) 0%, rgba(176, 125, 18, 0.02) 100%);
+    border-color: rgba(176, 125, 18, 0.18);
+}
+
+body[data-theme="light"] .recommended-q-card:hover {
+    border-color: rgba(176, 125, 18, 0.35);
+    box-shadow: 0 8px 25px rgba(176, 125, 18, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.rq-card-icon {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-size: 15px;
+    position: relative;
+    z-index: 1;
+}
+
+.rq-card-text {
+    font-size: 0.84rem;
+    color: var(--color-text);
+    line-height: 1.45;
+    margin: 0;
+    font-weight: 500;
+    position: relative;
+    z-index: 1;
+}
+
+/* ============================================
+   SEARCH INPUT ICON
+   ============================================ */
+
+.search-input-icon,
+.chat-input-icon {
+    color: var(--color-accent);
+    font-size: 16px;
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+
+.site-footer {
+    background: rgba(15, 15, 15, 0.8);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(212, 175, 55, 0.1);
+    padding: 28px 30px;
+    text-align: center;
+}
+
+body[data-theme="light"] .site-footer {
+    background: rgba(244, 241, 234, 0.85);
+    border-top: 1px solid rgba(176, 125, 18, 0.15);
+}
+
+.footer-content {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.footer-logo {
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 4px;
+}
+
+.footer-brand p {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary);
+    margin: 0;
+}
+
+.footer-links {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--color-text-secondary);
+}
+
+.footer-divider {
+    color: rgba(212, 175, 55, 0.4);
+}
+
+/* ============================================
+   ENHANCED UI – FOCUS GLOW & INPUT
+   ============================================ */
+
+.search-container:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.18), 0 0 8px rgba(212, 175, 55, 0.1);
+}
+
+.chat-input-container:focus-within {
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.18), 0 0 8px rgba(212, 175, 55, 0.1);
+}
+
+/* ============================================
    RESPONSIVE DESIGN
    ============================================ */
 
@@ -1392,6 +1570,19 @@ body[data-theme="light"] .glass-card {
     .step-connector {
         display: none;
     }
+
+    .recommended-questions-section {
+        padding: 12px 20px 0;
+    }
+
+    .recommended-questions-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .site-footer {
+        padding: 20px 15px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1447,5 +1638,13 @@ body[data-theme="light"] .glass-card {
 
     .modal-content {
         padding: 25px 15px;
+    }
+
+    .recommended-questions-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .recommended-questions-section {
+        padding: 10px 15px 0;
     }
 }
