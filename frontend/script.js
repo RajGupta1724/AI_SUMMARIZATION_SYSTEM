@@ -968,4 +968,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check backend every 30 seconds if user is logged in
     setInterval(() => { if (currentUser) checkBackendStatus(); }, 30000);
+
+    // Recommended Questions Cards – click to populate search bar
+    document.querySelectorAll('.recommended-q-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const question = card.getAttribute('data-question');
+            if (question) {
+                const input = document.getElementById('chatInput');
+                input.value = question;
+                input.focus();
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    });
 });
