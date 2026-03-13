@@ -129,6 +129,12 @@ document.getElementById('gateThemeToggle').addEventListener('click', () => {
 
 const PAGE_IDS = ['landingPage', 'processingPage', 'chatPage', 'chatHistoryPage', 'documentsPage', 'settingsPage'];
 
+function syncFooterHeightVariable() {
+    const footer = document.getElementById('siteFooter');
+    const footerHeight = footer ? footer.offsetHeight : 0;
+    document.documentElement.style.setProperty('--footer-height', `${footerHeight}px`);
+}
+
 function navigateToPage(pageId) {
     PAGE_IDS.forEach(id => {
         const el = document.getElementById(id);
@@ -136,6 +142,9 @@ function navigateToPage(pageId) {
     });
     const target = document.getElementById(pageId);
     if (target) target.classList.add('active');
+    document.body.classList.toggle('chat-active', pageId === 'chatPage');
+    document.body.classList.toggle('home-active', pageId === 'landingPage');
+    syncFooterHeightVariable();
 
     // Trigger page-specific load
     if (pageId === 'chatHistoryPage') loadChatHistoryPage();
@@ -386,6 +395,26 @@ function renderChatHistory(messages) {
     container.innerHTML = '';
     messages.forEach(m => addMessage(m.content, m.role === 'assistant' ? 'ai' : 'user', false));
     container.scrollTop = container.scrollHeight;
+
+    const hasUserMessages = messages.some(m => m.role === 'user');
+    if (hasUserMessages) showRecommendedQuestionsSection();
+    else hideRecommendedQuestionsSection();
+}
+
+function showRecommendedQuestionsSection() {
+    const section = document.getElementById('recommendedQuestionsSection');
+    if (!section) return;
+    section.classList.add('visible');
+    section.style.display = 'block';
+    section.setAttribute('aria-hidden', 'false');
+}
+
+function hideRecommendedQuestionsSection() {
+    const section = document.getElementById('recommendedQuestionsSection');
+    if (!section) return;
+    section.classList.remove('visible');
+    section.style.display = 'none';
+    section.setAttribute('aria-hidden', 'true');
 }
 
 // ============================================
@@ -465,24 +494,119 @@ async function performSearch(query) {
 
 const fileInput = document.getElementById('fileInput');
 const dropZone = document.getElementById('dropZone');
+const summaryPagesInput = document.getElementById('summaryPagesInput');
+const allPagesBtn = document.getElementById('allPagesBtn');
+const summaryPagesAfterInput = document.getElementById('summaryPagesAfterInput');
+const regenerateSummaryBtn = document.getElementById('regenerateSummaryBtn');
+
+function syncSummaryPagesChipState() {
+    if (!allPagesBtn || !summaryPagesInput) return;
+    allPagesBtn.classList.toggle('active', summaryPagesInput.value.trim() === '');
+}
+
+function setSummaryScopeNote(summaryScope) {
+    const summaryScopeNote = document.getElementById('summaryScopeNote');
+    if (!summaryScopeNote) return;
+    if (summaryScope?.type === 'first_n_pages') {
+        summaryScopeNote.textContent = `Summary generated from first ${summaryScope.used} page(s) out of ${summaryScope.total_pages}.`;
+        summaryScopeNote.style.display = 'block';
+        return;
+    }
+    if (summaryScope?.type === 'all_pages') {
+        summaryScopeNote.textContent = `Summary generated using all ${summaryScope.total_pages} page(s).`;
+        summaryScopeNote.style.display = 'block';
+        return;
+    }
+    summaryScopeNote.style.display = 'none';
+}
+
+function renderSuggestedQuestions(suggestedQuestions = []) {
+    const wrap = document.getElementById('suggestedQuestionsWrap');
+    const qContainer = document.getElementById('suggestedQuestions');
+    if (!wrap || !qContainer) return;
+
+    qContainer.innerHTML = '';
+    if (!suggestedQuestions.length) {
+        wrap.style.display = 'none';
+        return;
+    }
+
+    suggestedQuestions.forEach(q => {
+        const btn = document.createElement('button');
+        btn.className = 'suggested-q-btn';
+        btn.textContent = q;
+        btn.addEventListener('click', () => {
+            startChattingWithQuestion(q);
+        });
+        qContainer.appendChild(btn);
+    });
+    wrap.style.display = 'block';
+}
+
+function getRequestedSummaryPages() {
+    if (!summaryPagesInput) return null;
+    const raw = summaryPagesInput.value.trim();
+    if (!raw) return null;
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isNaN(parsed) || parsed < 1) {
+        throw new Error('Summary pages must be a positive number.');
+    }
+    return parsed;
+}
+
+if (allPagesBtn && summaryPagesInput) {
+    allPagesBtn.addEventListener('click', () => {
+        summaryPagesInput.value = '';
+        syncSummaryPagesChipState();
+        summaryPagesInput.focus();
+    });
+
+    summaryPagesInput.addEventListener('input', syncSummaryPagesChipState);
+}
 
 document.getElementById('systemUploadBtn').addEventListener('click', () => {
     if (!currentUser) { showToast('Please log in first', 'error'); return; }
+    fileInput.value = '';
     fileInput.click();
 });
 
-dropZone.addEventListener('click', () => {
+dropZone.addEventListener('click', event => {
+    // Do not hijack clicks meant for controls inside the drop zone.
+    if (event.target.closest('input, button, label, textarea, select')) return;
     if (!currentUser) { showToast('Please log in first', 'error'); return; }
+    fileInput.value = '';
     fileInput.click();
 });
 
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, e => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drag-over');
+    });
+});
+
+dropZone.addEventListener('dragleave', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dropZone.contains(e.relatedTarget)) {
+        dropZone.classList.remove('drag-over');
+    }
+});
+
 dropZone.addEventListener('drop', e => {
     e.preventDefault();
+    e.stopPropagation();
     dropZone.classList.remove('drag-over');
     if (!currentUser) { showToast('Please log in first', 'error'); return; }
     if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
+});
+
+// Prevent browser from opening dropped files outside the drop-zone.
+['dragover', 'drop'].forEach(eventName => {
+    window.addEventListener(eventName, e => {
+        e.preventDefault();
+    });
 });
 
 fileInput.addEventListener('change', e => {
@@ -495,8 +619,18 @@ document.getElementById('docsUploadBtn').addEventListener('click', () => {
 });
 
 async function handleFileUpload(file) {
-    if (!file.type.includes('pdf')) {
+    const fileName = file?.name || '';
+    const isPdf = (file.type && file.type.toLowerCase().includes('pdf')) || fileName.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
         showToast('Please upload a PDF file only', 'error');
+        return;
+    }
+
+    let requestedSummaryPages = null;
+    try {
+        requestedSummaryPages = getRequestedSummaryPages();
+    } catch (error) {
+        showToast(error.message, 'error');
         return;
     }
 
@@ -522,6 +656,9 @@ async function handleFileUpload(file) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('user_id', currentUser.id);
+    if (requestedSummaryPages !== null) {
+        formData.append('summary_pages', String(requestedSummaryPages));
+    }
 
     try {
         updateProcessingSteps(2);
@@ -555,23 +692,15 @@ async function handleFileUpload(file) {
         summaryContent.innerHTML = formatMessageContent(data.summary || 'Summary generated successfully.');
 
         document.getElementById('confidenceScore').textContent = `Pages: ${data.pages || '?'}`;
-
-        // Show suggested questions
-        if (data.suggested_questions && data.suggested_questions.length > 0) {
-            const wrap = document.getElementById('suggestedQuestionsWrap');
-            const qContainer = document.getElementById('suggestedQuestions');
-            qContainer.innerHTML = '';
-            data.suggested_questions.forEach(q => {
-                const btn = document.createElement('button');
-                btn.className = 'suggested-q-btn';
-                btn.textContent = q;
-                btn.addEventListener('click', () => {
-                    startChattingWithQuestion(q);
-                });
-                qContainer.appendChild(btn);
-            });
-            wrap.style.display = 'block';
+        setSummaryScopeNote(data.summary_scope);
+        const summaryPagesActions = document.getElementById('summaryPagesActions');
+        if (summaryPagesActions) {
+            summaryPagesActions.style.display = 'block';
         }
+        if (summaryPagesAfterInput) {
+            summaryPagesAfterInput.value = requestedSummaryPages ? String(requestedSummaryPages) : '';
+        }
+        renderSuggestedQuestions(data.suggested_questions || []);
 
         showProcessingSummary();
         showToast('Document processed successfully!', 'success');
@@ -602,6 +731,51 @@ function showProcessingSummary() {
     document.getElementById('summaryCard').classList.add('fade-in');
 }
 
+if (regenerateSummaryBtn) {
+    regenerateSummaryBtn.addEventListener('click', async () => {
+        if (!currentDocument || !currentUser) return;
+
+        const raw = summaryPagesAfterInput ? summaryPagesAfterInput.value.trim() : '';
+        const summaryPages = raw ? Number.parseInt(raw, 10) : null;
+        if (raw && (Number.isNaN(summaryPages) || summaryPages < 1)) {
+            showToast('Please enter a valid positive page count.', 'error');
+            return;
+        }
+
+        regenerateSummaryBtn.disabled = true;
+        const originalLabel = regenerateSummaryBtn.textContent;
+        regenerateSummaryBtn.textContent = 'Updating...';
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/api/documents/${currentDocument.id}/summary-update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    summary_pages: summaryPages
+                })
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.detail || 'Failed to update summary');
+            }
+
+            const data = await response.json();
+            const summaryContent = document.getElementById('summaryContent');
+            summaryContent.innerHTML = formatMessageContent(data.summary || 'Summary updated.');
+            setSummaryScopeNote(data.summary_scope);
+            renderSuggestedQuestions(data.suggested_questions || []);
+            showToast('Summary updated successfully.', 'success');
+        } catch (error) {
+            showToast(error.message || 'Failed to update summary.', 'error');
+        } finally {
+            regenerateSummaryBtn.disabled = false;
+            regenerateSummaryBtn.textContent = originalLabel;
+        }
+    });
+}
+
 document.getElementById('startChattingBtn').addEventListener('click', () => {
     initializeChatPage();
     navigateToPage('chatPage');
@@ -625,6 +799,7 @@ function initializeChatPage() {
     currentConversationId = null;
     conversationHistory = [];
     updateDocumentInfo();
+    hideRecommendedQuestionsSection();
 
     const chatMessages = document.getElementById('chatMessages');
     chatMessages.innerHTML = `
@@ -658,6 +833,7 @@ document.getElementById('newChatBtn').addEventListener('click', async () => {
     if (!ok) return;
     currentConversationId = null;
     conversationHistory = [];
+    hideRecommendedQuestionsSection();
     chatMessages.innerHTML = `
         <div class="message ai-message fade-in">
             <div class="message-content">
@@ -674,6 +850,7 @@ async function sendChatMessage() {
         return;
     }
 
+    showRecommendedQuestionsSection();
     addMessage(message, 'user');
     chatInput.value = '';
     typingIndicator.style.display = 'flex';
@@ -959,6 +1136,9 @@ function closeCloudModal() {
 
 document.addEventListener('DOMContentLoaded', () => {
     navigateToPage('landingPage');
+    syncFooterHeightVariable();
+    syncSummaryPagesChipState();
+    window.addEventListener('resize', syncFooterHeightVariable);
 
     // Staggered fade-in
     document.querySelectorAll('.fade-in[style*="animation-delay"]').forEach(el => {
@@ -971,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Recommended Questions Cards – click to populate search bar
     document.querySelectorAll('.recommended-q-card').forEach(card => {
-        card.addEventListener('click', () => {
+        const setQuestionInInput = () => {
             const question = card.getAttribute('data-question');
             if (question) {
                 const input = document.getElementById('chatInput');
@@ -986,6 +1166,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.style.borderColor = '';
                     card.style.boxShadow = '';
                 }, 400);
+            }
+        };
+
+        card.addEventListener('click', setQuestionInInput);
+        card.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setQuestionInInput();
             }
         });
     });

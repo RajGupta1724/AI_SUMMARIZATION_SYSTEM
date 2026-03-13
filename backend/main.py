@@ -90,6 +90,11 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
     history: Optional[List[Dict[str, str]]] = []
 
+
+class SummaryUpdateRequest(BaseModel):
+    user_id: str
+    summary_pages: Optional[int] = None
+
 class DeleteRequest(BaseModel):
     user_id: str
 
@@ -487,7 +492,8 @@ async def health_check():
 @app.post("/api/documents/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    user_id: str = Form(...)
+    user_id: str = Form(...),
+    summary_pages: Optional[int] = Form(None)
 ):
     """
     Upload and process a PDF document.
@@ -520,6 +526,9 @@ async def upload_document(
     total_pages = extracted["total_pages"]
     word_count = extracted["word_count"]
 
+    if summary_pages is not None and summary_pages < 1:
+        raise HTTPException(status_code=400, detail="summary_pages must be greater than 0")
+
     if word_count < 10:
         raise HTTPException(status_code=422, detail="PDF appears to be empty or image-only (no extractable text)")
 
@@ -545,14 +554,34 @@ async def upload_document(
         "chunks": chunks,
         "tree": tree,
         "full_text": full_text[:50000],  # keep first 50k chars for summary
+        "pages_text": pages_text,
         "pages": total_pages,
         "words": word_count,
         "user_id": user_id
     }
 
-    # 6. Generate summary
+    # 6. Generate summary (optionally from first N pages)
     logger.info("Generating summary…")
-    summary = generate_summary(full_text)
+    summary_source_text = full_text
+    summary_scope = {
+        "type": "all_pages",
+        "used": total_pages,
+        "total_pages": total_pages
+    }
+
+    if summary_pages is not None:
+        selected_pages = min(summary_pages, total_pages)
+        selected_text = "\n\n".join((p.get("text") or "") for p in pages_text[:selected_pages]).strip()
+        if selected_text:
+            summary_source_text = selected_text
+        summary_scope = {
+            "type": "first_n_pages",
+            "requested": summary_pages,
+            "used": selected_pages,
+            "total_pages": total_pages
+        }
+
+    summary = generate_summary(summary_source_text)
 
     # 7. Generate suggested questions
     suggested_questions = generate_suggested_questions(summary)
@@ -581,6 +610,63 @@ async def upload_document(
         "words": word_count,
         "chunks": len(chunks),
         "summary": summary,
+        "summary_scope": summary_scope,
+        "suggested_questions": suggested_questions
+    }
+
+@app.post("/api/documents/{document_id}/summary-update")
+async def update_document_summary(document_id: str, request: SummaryUpdateRequest):
+    if not await verify_user(request.user_id):
+        raise HTTPException(status_code=401, detail="Invalid user")
+
+    if document_id not in DOCUMENT_STORE:
+        raise HTTPException(status_code=404, detail="Document not found in memory. Please re-upload the document.")
+
+    doc = DOCUMENT_STORE[document_id]
+    if doc.get("user_id") != request.user_id:
+        raise HTTPException(status_code=403, detail="You are not allowed to update this document summary")
+
+    if request.summary_pages is not None and request.summary_pages < 1:
+        raise HTTPException(status_code=400, detail="summary_pages must be greater than 0")
+
+    total_pages = int(doc.get("pages") or 0)
+    pages_text = doc.get("pages_text") or []
+    full_text = doc.get("full_text") or ""
+
+    summary_source_text = full_text
+    summary_scope = {
+        "type": "all_pages",
+        "used": total_pages,
+        "total_pages": total_pages
+    }
+
+    if request.summary_pages is not None and total_pages > 0:
+        selected_pages = min(request.summary_pages, total_pages)
+        selected_text = "\n\n".join((p.get("text") or "") for p in pages_text[:selected_pages]).strip() if pages_text else ""
+        if selected_text:
+            summary_source_text = selected_text
+        summary_scope = {
+            "type": "first_n_pages",
+            "requested": request.summary_pages,
+            "used": selected_pages,
+            "total_pages": total_pages
+        }
+
+    summary = generate_summary(summary_source_text)
+    suggested_questions = generate_suggested_questions(summary)
+    doc["latest_summary"] = summary
+
+    try:
+        supabase.table("documents").update({
+            "summary": summary
+        }).eq("id", document_id).eq("user_id", request.user_id).execute()
+    except Exception as e:
+        logger.warning(f"Supabase summary update failed (non-fatal): {e}")
+
+    return {
+        "document_id": document_id,
+        "summary": summary,
+        "summary_scope": summary_scope,
         "suggested_questions": suggested_questions
     }
 
