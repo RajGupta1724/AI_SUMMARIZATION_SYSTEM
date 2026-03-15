@@ -59,6 +59,44 @@ MAX_CONTEXT_TOKENS = int(os.getenv("MAX_CONTEXT_TOKENS", "3000"))
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "500"))             # words per leaf chunk
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))
 
+
+def list_ollama_models() -> List[str]:
+    """Return locally available Ollama model names."""
+    try:
+        response = ollama.list()
+        if hasattr(response, "models"):
+            return [m.model for m in response.models if getattr(m, "model", None)]
+        if isinstance(response, dict):
+            models = response.get("models", [])
+            return [m.get("name") for m in models if m.get("name")]
+    except Exception as e:
+        logger.warning(f"Unable to list Ollama models: {e}")
+    return []
+
+
+def resolve_model(preferred: str, fallback_prefixes: Optional[List[str]] = None) -> Optional[str]:
+    """
+    Resolve a model name against installed Ollama models.
+    Accepts exact name, or '<name>:latest' variant, then tries prefix fallbacks.
+    """
+    available = list_ollama_models()
+    if not available:
+        return None
+
+    if preferred in available:
+        return preferred
+    if f"{preferred}:latest" in available:
+        return f"{preferred}:latest"
+    if preferred.endswith(":latest") and preferred[:-7] in available:
+        return preferred[:-7]
+
+    for prefix in (fallback_prefixes or []):
+        for model_name in available:
+            if model_name.startswith(prefix):
+                return model_name
+
+    return available[0]
+
 # ============================================================
 # SUPABASE CLIENT
 # ============================================================
@@ -208,7 +246,10 @@ def create_chunks(pages_text: List[Dict], chunk_size: int = CHUNK_SIZE, overlap:
 def get_embedding(text: str) -> List[float]:
     """Get embedding from Ollama's local embedding model."""
     try:
-        resp = ollama.embeddings(model=EMBEDDING_MODEL, prompt=text[:4096])
+        model_name = resolve_model(EMBEDDING_MODEL, fallback_prefixes=["nomic-embed-text", "mxbai-embed-large", "all-minilm"])
+        if not model_name:
+            raise RuntimeError("No embedding model found in Ollama")
+        resp = ollama.embeddings(model=model_name, prompt=text[:4096])
         return resp["embedding"]
     except Exception as e:
         logger.warning(f"Embedding failed: {e}. Using zero vector.")
@@ -385,8 +426,11 @@ def build_llm_prompt(query: str, context_chunks: List[ChunkNode],
 def generate_llm_response(messages: List[Dict[str, str]]) -> str:
     """Call Ollama with the full message list."""
     try:
+        model_name = resolve_model(OLLAMA_MODEL, fallback_prefixes=["llama3", "mistral", "phi3"])
+        if not model_name:
+            raise RuntimeError("No chat model found in Ollama. Please run 'ollama pull llama3'.")
         response = ollama.chat(
-            model=OLLAMA_MODEL,
+            model=model_name,
             messages=messages,
             options={"temperature": 0.3, "num_ctx": 4096}
         )
@@ -452,10 +496,12 @@ async def verify_user(user_id: str) -> bool:
 # ============================================================
 
 @app.get("/health")
+@app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
     ollama_ok = False
     available_models = []
+    ollama_error = None
 
     try:
         response = ollama.list()
@@ -472,18 +518,15 @@ async def health_check():
             ]
 
     except Exception as e:
-        return {
-            "status": "error",
-            "timestamp": datetime.utcnow().isoformat(),
-            "ollama": False,
-            "error": str(e),
-            "loaded_documents": len(DOCUMENT_STORE)
-        }
+        ollama_error = str(e)
 
     return {
-        "status": "ok",
+        "status": "ok" if ollama_ok else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
         "ollama": ollama_ok,
+        "error": ollama_error,
+        "selected_chat_model": resolve_model(OLLAMA_MODEL, fallback_prefixes=["llama3", "mistral", "phi3"]),
+        "selected_embedding_model": resolve_model(EMBEDDING_MODEL, fallback_prefixes=["nomic-embed-text", "mxbai-embed-large", "all-minilm"]),
         "available_models": available_models,
         "loaded_documents": len(DOCUMENT_STORE)
     }
