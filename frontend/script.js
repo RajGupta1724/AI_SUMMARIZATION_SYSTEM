@@ -158,22 +158,55 @@ function navigateToPage(pageId) {
 // BACKEND CONNECTION CHECK
 // ============================================
 
+let backendStatusFailures = 0;
+let isSummaryProcessing = false;
+
+function setBackendStatusProcessing() {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if (!dot || !text) return;
+    dot.className = 'status-dot checking';
+    text.textContent = 'Processing document…';
+}
+
 async function checkBackendStatus() {
     const dot = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
+    if (!dot || !text) return;
+
+    // While summary generation is in progress, avoid declaring backend offline
+    // because upload/LLM work can temporarily delay health responses.
+    if (isSummaryProcessing) {
+        setBackendStatusProcessing();
+        return;
+    }
+
     dot.className = 'status-dot checking';
     text.textContent = 'Connecting…';
     try {
-        const res = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(4000) });
+        const res = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(8000) });
         if (res.ok) {
-            dot.className = 'status-dot online';
-            text.textContent = 'Backend Online';
+            const data = await res.json().catch(() => ({}));
+            backendStatusFailures = 0;
+            if (data.ollama === false) {
+                dot.className = 'status-dot checking';
+                text.textContent = 'Backend Online • AI Model Offline';
+            } else {
+                dot.className = 'status-dot online';
+                text.textContent = 'Backend Online';
+            }
         } else {
             throw new Error('not ok');
         }
     } catch {
-        dot.className = 'status-dot offline';
-        text.textContent = 'Backend Offline';
+        backendStatusFailures += 1;
+        if (backendStatusFailures >= 2) {
+            dot.className = 'status-dot offline';
+            text.textContent = 'Backend Offline';
+        } else {
+            dot.className = 'status-dot checking';
+            text.textContent = 'Reconnecting…';
+        }
     }
 }
 
@@ -661,6 +694,8 @@ async function handleFileUpload(file) {
     }
 
     try {
+        isSummaryProcessing = true;
+        setBackendStatusProcessing();
         updateProcessingSteps(2);
         const response = await fetch(`${BACKEND_URL}/api/documents/upload`, {
             method: 'POST',
@@ -706,8 +741,12 @@ async function handleFileUpload(file) {
         showToast('Document processed successfully!', 'success');
         fetchSidebarHistory();
         loadDocumentsPage();
+        isSummaryProcessing = false;
+        checkBackendStatus();
 
     } catch (error) {
+        isSummaryProcessing = false;
+        checkBackendStatus();
         clearInterval(progressInterval);
         console.error('Upload failed:', error);
         showToast(error.message || 'Failed to process document. Is the backend running?', 'error');
@@ -745,6 +784,8 @@ if (regenerateSummaryBtn) {
         regenerateSummaryBtn.disabled = true;
         const originalLabel = regenerateSummaryBtn.textContent;
         regenerateSummaryBtn.textContent = 'Updating...';
+        isSummaryProcessing = true;
+        setBackendStatusProcessing();
 
         try {
             const response = await fetch(`${BACKEND_URL}/api/documents/${currentDocument.id}/summary-update`, {
@@ -770,6 +811,8 @@ if (regenerateSummaryBtn) {
         } catch (error) {
             showToast(error.message || 'Failed to update summary.', 'error');
         } finally {
+            isSummaryProcessing = false;
+            checkBackendStatus();
             regenerateSummaryBtn.disabled = false;
             regenerateSummaryBtn.textContent = originalLabel;
         }
